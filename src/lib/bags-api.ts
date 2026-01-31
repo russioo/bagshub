@@ -1,157 +1,149 @@
-import type { BagsToken, TokenListResponse, TokenDetailResponse, PricePoint, Transaction, Holder } from '@/types';
-
-const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
-const API_KEY = process.env.BAGS_API_KEY || '';
-
-interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  body?: unknown;
-  headers?: Record<string, string>;
+export interface BagsToken {
+  mint: string;
+  name: string;
+  symbol: string;
+  description?: string;
+  image?: string;
+  price: number;
+  priceChange24h: number;
+  volume24h: number;
+  marketCap: number;
+  liquidity: number;
+  holders: number;
+  createdAt: string;
 }
 
-class BagsAPI {
-  private rateLimitRemaining = 1000;
-  private rateLimitReset = Date.now();
-
-  private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    const { method = 'GET', body, headers = {} } = options;
-
-    // Check rate limit
-    if (this.rateLimitRemaining <= 0 && Date.now() < this.rateLimitReset) {
-      throw new Error('Rate limit exceeded. Please wait.');
-    }
-
-    const response = await fetch(`${BAGS_API_BASE}${endpoint}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        ...headers,
-      },
-      body: body ? JSON.stringify(body) : undefined,
+// Get trending Solana tokens from DexScreener
+export async function getTokens(): Promise<BagsToken[]> {
+  try {
+    // Get Solana token pairs sorted by volume
+    const res = await fetch('https://api.dexscreener.com/token-boosts/top/v1', {
+      next: { revalidate: 60 },
     });
-
-    // Update rate limit info
-    const remaining = response.headers.get('X-RateLimit-Remaining');
-    const reset = response.headers.get('X-RateLimit-Reset');
-    if (remaining) this.rateLimitRemaining = parseInt(remaining);
-    if (reset) this.rateLimitReset = parseInt(reset) * 1000;
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'API Error' }));
-      throw new Error(error.message || `API Error: ${response.status}`);
+    
+    if (!res.ok) {
+      // Fallback: Get trending from token profiles
+      return getTokensFallback();
     }
-
-    return response.json();
-  }
-
-  // Get all tokens with pagination
-  async getTokens(page = 1, limit = 50, sort = 'volume'): Promise<TokenListResponse> {
-    return this.request<TokenListResponse>(
-      `/tokens?page=${page}&limit=${limit}&sort=${sort}`
-    );
-  }
-
-  // Get trending tokens
-  async getTrendingTokens(limit = 20): Promise<BagsToken[]> {
-    const data = await this.request<{ tokens: BagsToken[] }>(
-      `/tokens/trending?limit=${limit}`
-    );
-    return data.tokens;
-  }
-
-  // Get token by mint address
-  async getToken(mint: string): Promise<TokenDetailResponse> {
-    return this.request<TokenDetailResponse>(`/tokens/${mint}`);
-  }
-
-  // Get token price history
-  async getPriceHistory(mint: string, interval = '1h', limit = 100): Promise<PricePoint[]> {
-    const data = await this.request<{ history: PricePoint[] }>(
-      `/tokens/${mint}/price-history?interval=${interval}&limit=${limit}`
-    );
-    return data.history;
-  }
-
-  // Get token transactions
-  async getTransactions(mint: string, limit = 50): Promise<Transaction[]> {
-    const data = await this.request<{ transactions: Transaction[] }>(
-      `/tokens/${mint}/transactions?limit=${limit}`
-    );
-    return data.transactions;
-  }
-
-  // Get token holders
-  async getHolders(mint: string, limit = 20): Promise<Holder[]> {
-    const data = await this.request<{ holders: Holder[] }>(
-      `/tokens/${mint}/holders?limit=${limit}`
-    );
-    return data.holders;
-  }
-
-  // Search tokens
-  async searchTokens(query: string, limit = 20): Promise<BagsToken[]> {
-    const data = await this.request<{ tokens: BagsToken[] }>(
-      `/tokens/search?q=${encodeURIComponent(query)}&limit=${limit}`
-    );
-    return data.tokens;
-  }
-
-  // Get leaderboard
-  async getLeaderboard(
-    type: 'gainers' | 'losers' | 'volume' | 'newest' | 'holders',
-    limit = 20
-  ): Promise<BagsToken[]> {
-    const data = await this.request<{ tokens: BagsToken[] }>(
-      `/tokens/leaderboard/${type}?limit=${limit}`
-    );
-    return data.tokens;
-  }
-
-  // Create token (requires auth)
-  async createToken(tokenData: {
-    name: string;
-    symbol: string;
-    description?: string;
-    image?: string;
-    twitter?: string;
-    website?: string;
-    telegram?: string;
-  }): Promise<{ mint: string; signature: string }> {
-    return this.request('/tokens/create', {
-      method: 'POST',
-      body: tokenData,
-    });
-  }
-
-  // Upload image for token
-  async uploadImage(file: File): Promise<{ url: string }> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch(`${BAGS_API_BASE}/upload`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': API_KEY,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to upload image');
+    
+    const data = await res.json();
+    
+    // Filter for Solana only
+    const solanaPairs = (data || [])
+      .filter((p: any) => p.chainId === 'solana')
+      .slice(0, 50);
+    
+    if (solanaPairs.length === 0) {
+      return getTokensFallback();
     }
-
-    return response.json();
-  }
-
-  // Get rate limit status
-  getRateLimitStatus() {
-    return {
-      remaining: this.rateLimitRemaining,
-      resetAt: new Date(this.rateLimitReset),
-    };
+    
+    // Get detailed data for each token
+    const mints = solanaPairs.map((p: any) => p.tokenAddress).filter(Boolean);
+    return getTokensByMints(mints);
+  } catch {
+    return getTokensFallback();
   }
 }
 
-export const bagsAPI = new BagsAPI();
-export default bagsAPI;
+async function getTokensFallback(): Promise<BagsToken[]> {
+  try {
+    // Try token profiles endpoint
+    const res = await fetch('https://api.dexscreener.com/token-profiles/latest/v1', {
+      next: { revalidate: 60 },
+    });
+    
+    if (!res.ok) return [];
+    
+    const data = await res.json();
+    const solanaTokens = (data || [])
+      .filter((t: any) => t.chainId === 'solana')
+      .slice(0, 50);
+    
+    const mints = solanaTokens.map((t: any) => t.tokenAddress).filter(Boolean);
+    return getTokensByMints(mints);
+  } catch {
+    return [];
+  }
+}
+
+async function getTokensByMints(mints: string[]): Promise<BagsToken[]> {
+  if (mints.length === 0) return [];
+  
+  try {
+    const mintStr = mints.slice(0, 30).join(',');
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintStr}`, {
+      next: { revalidate: 30 },
+    });
+    
+    if (!res.ok) return [];
+    
+    const data = await res.json();
+    if (!data.pairs) return [];
+    
+    // Group by token and get best pair
+    const tokenMap = new Map<string, any>();
+    for (const pair of data.pairs) {
+      if (pair.chainId !== 'solana') continue;
+      
+      const mint = pair.baseToken?.address;
+      if (!mint) continue;
+      
+      const existing = tokenMap.get(mint);
+      if (!existing || (pair.liquidity?.usd || 0) > (existing.liquidity?.usd || 0)) {
+        tokenMap.set(mint, pair);
+      }
+    }
+    
+    return Array.from(tokenMap.values())
+      .sort((a, b) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
+      .map(pairToToken);
+  } catch {
+    return [];
+  }
+}
+
+function pairToToken(pair: any): BagsToken {
+  return {
+    mint: pair.baseToken?.address || '',
+    name: pair.baseToken?.name || 'Unknown',
+    symbol: pair.baseToken?.symbol || '???',
+    image: pair.info?.imageUrl || '',
+    price: parseFloat(pair.priceUsd) || 0,
+    priceChange24h: pair.priceChange?.h24 || 0,
+    volume24h: pair.volume?.h24 || 0,
+    marketCap: pair.marketCap || pair.fdv || 0,
+    liquidity: pair.liquidity?.usd || 0,
+    holders: 0,
+    createdAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : '',
+  };
+}
+
+export async function getTrendingTokens(): Promise<BagsToken[]> {
+  const tokens = await getTokens();
+  return tokens.sort((a, b) => b.volume24h - a.volume24h).slice(0, 20);
+}
+
+export async function getToken(mint: string): Promise<BagsToken | null> {
+  try {
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
+      next: { revalidate: 30 },
+    });
+    
+    if (!res.ok) return null;
+    
+    const data = await res.json();
+    if (!data.pairs || data.pairs.length === 0) return null;
+    
+    // Get Solana pair with best liquidity
+    const solanaPairs = data.pairs.filter((p: any) => p.chainId === 'solana');
+    if (solanaPairs.length === 0) return null;
+    
+    const pair = solanaPairs.reduce((best: any, p: any) => 
+      (p.liquidity?.usd || 0) > (best.liquidity?.usd || 0) ? p : best
+    );
+    
+    return pairToToken(pair);
+  } catch {
+    return null;
+  }
+}

@@ -1,31 +1,55 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
-import { Navbar } from '@/components/navbar';
-import { Providers } from './providers';
+import Link from 'next/link';
 
-const inter = Inter({ subsets: ['latin'] });
-
-export const metadata: Metadata = {
-  title: 'BagsHub - The Ultimate Token Tracker for Bags on Solana',
-  description: 'Track, launch, and research tokens on the Bags protocol. Real-time prices, charts, and community chat.',
-  keywords: ['Solana', 'Bags', 'crypto', 'tokens', 'DeFi', 'trading'],
+export const metadata = {
+  title: 'BagsHub',
+  description: 'Token tracker for Bags on Solana',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} min-h-screen bg-background antialiased`}>
-        <Providers>
-          <Navbar />
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {children}
-          </main>
-        </Providers>
+    <html lang="en">
+      <body>
+        <header style={{
+          borderBottom: '1px solid var(--border)',
+          padding: '16px 32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 100,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
+            <Link href="/" style={{ fontSize: '18px', fontWeight: 600, letterSpacing: '-0.5px' }}>
+              BagsHub
+            </Link>
+            <nav style={{ display: 'flex', gap: '24px', fontSize: '14px', color: 'var(--text-muted)' }}>
+              <Link href="/" style={{ transition: 'color 0.15s' }}>Tokens</Link>
+              <Link href="/trending" style={{ transition: 'color 0.15s' }}>Trending</Link>
+              <Link href="/new" style={{ transition: 'color 0.15s' }}>New</Link>
+              <Link href="/gainers" style={{ transition: 'color 0.15s' }}>Gainers</Link>
+            </nav>
+          </div>
+          <Link 
+            href="/launch" 
+            style={{
+              fontSize: '14px',
+              fontWeight: 500,
+              padding: '8px 16px',
+              background: 'var(--green)',
+              color: '#000',
+              borderRadius: '6px',
+            }}
+          >
+            Launch Token
+          </Link>
+        </header>
+        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px' }}>
+          {children}
+        </main>
       </body>
     </html>
   );
