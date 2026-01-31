@@ -1,37 +1,59 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
-import { Providers } from './providers';
-import { Navbar } from '@/components/layout/navbar';
-import { Sidebar } from '@/components/layout/sidebar';
+import Link from 'next/link';
 
-const inter = Inter({ subsets: ['latin'] });
-
-export const metadata: Metadata = {
-  title: 'BagsHub - The Ultimate Hub for Bags Tokens',
-  description: 'Launch tokens, track trending coins, research with AI, and engage with the Bags community on Solana.',
-  keywords: ['Solana', 'Bags', 'tokens', 'crypto', 'meme coins', 'dex'],
+export const metadata = {
+  title: 'BagsHub',
+  description: 'Token tracker for Bags on Solana',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-bags-dark text-gray-100 antialiased`}>
-        <Providers>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <div className="flex flex-1 flex-col lg:pl-64">
-              <Navbar />
-              <main className="flex-1 px-4 py-6 lg:px-8">
-                {children}
-              </main>
-            </div>
+    <html lang="en">
+      <body>
+        {/* Header */}
+        <header style={{
+          borderBottom: '1px solid var(--border)',
+          padding: '12px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          background: 'var(--bg)',
+          zIndex: 100,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+            <Link href="/" style={{ fontWeight: 700, fontSize: '18px', color: 'var(--green)' }}>
+              BagsHub
+            </Link>
+            <nav style={{ display: 'flex', gap: '24px', fontSize: '14px' }}>
+              <Link href="/" style={{ color: 'var(--text-secondary)' }}>Tokens</Link>
+              <Link href="/new" style={{ color: 'var(--text-secondary)' }}>New</Link>
+              <Link href="/gainers" style={{ color: 'var(--text-secondary)' }}>Gainers</Link>
+              <Link href="/launch" style={{ color: 'var(--text-secondary)' }}>Launch</Link>
+            </nav>
           </div>
-        </Providers>
+          <div>
+            <input 
+              type="text" 
+              placeholder="Search tokens..."
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                color: 'var(--text)',
+                width: '240px',
+                fontSize: '14px',
+              }}
+            />
+          </div>
+        </header>
+
+        {/* Main */}
+        <main style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+          {children}
+        </main>
       </body>
     </html>
   );
