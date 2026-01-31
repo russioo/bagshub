@@ -1,115 +1,157 @@
-/**
- * Bags API Client
- * https://docs.bags.fm/
- */
+import type { BagsToken, TokenListResponse, TokenDetailResponse, PricePoint, Transaction, Holder } from '@/types';
 
-const BAGS_API = 'https://public-api-v2.bags.fm/api/v1';
+const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
+const API_KEY = process.env.BAGS_API_KEY || '';
 
-interface BagsConfig {
-  apiKey?: string;
+interface RequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  body?: unknown;
+  headers?: Record<string, string>;
 }
 
 class BagsAPI {
-  private apiKey?: string;
+  private rateLimitRemaining = 1000;
+  private rateLimitReset = Date.now();
 
-  constructor(config?: BagsConfig) {
-    this.apiKey = config?.apiKey || process.env.BAGS_API_KEY;
-  }
+  private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+    const { method = 'GET', body, headers = {} } = options;
 
-  private async fetch(endpoint: string, options: RequestInit = {}) {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    
-    if (this.apiKey) {
-      headers['x-api-key'] = this.apiKey;
+    // Check rate limit
+    if (this.rateLimitRemaining <= 0 && Date.now() < this.rateLimitReset) {
+      throw new Error('Rate limit exceeded. Please wait.');
     }
 
-    const res = await fetch(`${BAGS_API}${endpoint}`, {
-      ...options,
-      headers: { ...headers, ...options.headers },
+    const response = await fetch(`${BAGS_API_BASE}${endpoint}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY,
+        ...headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
     });
 
-    if (!res.ok) {
-      throw new Error(`Bags API error: ${res.status}`);
+    // Update rate limit info
+    const remaining = response.headers.get('X-RateLimit-Remaining');
+    const reset = response.headers.get('X-RateLimit-Reset');
+    if (remaining) this.rateLimitRemaining = parseInt(remaining);
+    if (reset) this.rateLimitReset = parseInt(reset) * 1000;
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'API Error' }));
+      throw new Error(error.message || `API Error: ${response.status}`);
     }
 
-    return res.json();
+    return response.json();
   }
 
-  // Get trade quote
-  async getQuote(params: {
-    inputMint: string;
-    outputMint: string;
-    amount: number;
-    slippageMode?: 'auto' | 'manual';
-    slippageBps?: number;
-  }) {
-    const query = new URLSearchParams({
-      inputMint: params.inputMint,
-      outputMint: params.outputMint,
-      amount: params.amount.toString(),
-      slippageMode: params.slippageMode || 'auto',
-    });
-    
-    if (params.slippageBps) {
-      query.set('slippageBps', params.slippageBps.toString());
-    }
-
-    return this.fetch(`/trade/quote?${query}`);
+  // Get all tokens with pagination
+  async getTokens(page = 1, limit = 50, sort = 'volume'): Promise<TokenListResponse> {
+    return this.request<TokenListResponse>(
+      `/tokens?page=${page}&limit=${limit}&sort=${sort}`
+    );
   }
 
-  // Create token - Step 1: Create metadata
-  async createTokenInfo(data: {
+  // Get trending tokens
+  async getTrendingTokens(limit = 20): Promise<BagsToken[]> {
+    const data = await this.request<{ tokens: BagsToken[] }>(
+      `/tokens/trending?limit=${limit}`
+    );
+    return data.tokens;
+  }
+
+  // Get token by mint address
+  async getToken(mint: string): Promise<TokenDetailResponse> {
+    return this.request<TokenDetailResponse>(`/tokens/${mint}`);
+  }
+
+  // Get token price history
+  async getPriceHistory(mint: string, interval = '1h', limit = 100): Promise<PricePoint[]> {
+    const data = await this.request<{ history: PricePoint[] }>(
+      `/tokens/${mint}/price-history?interval=${interval}&limit=${limit}`
+    );
+    return data.history;
+  }
+
+  // Get token transactions
+  async getTransactions(mint: string, limit = 50): Promise<Transaction[]> {
+    const data = await this.request<{ transactions: Transaction[] }>(
+      `/tokens/${mint}/transactions?limit=${limit}`
+    );
+    return data.transactions;
+  }
+
+  // Get token holders
+  async getHolders(mint: string, limit = 20): Promise<Holder[]> {
+    const data = await this.request<{ holders: Holder[] }>(
+      `/tokens/${mint}/holders?limit=${limit}`
+    );
+    return data.holders;
+  }
+
+  // Search tokens
+  async searchTokens(query: string, limit = 20): Promise<BagsToken[]> {
+    const data = await this.request<{ tokens: BagsToken[] }>(
+      `/tokens/search?q=${encodeURIComponent(query)}&limit=${limit}`
+    );
+    return data.tokens;
+  }
+
+  // Get leaderboard
+  async getLeaderboard(
+    type: 'gainers' | 'losers' | 'volume' | 'newest' | 'holders',
+    limit = 20
+  ): Promise<BagsToken[]> {
+    const data = await this.request<{ tokens: BagsToken[] }>(
+      `/tokens/leaderboard/${type}?limit=${limit}`
+    );
+    return data.tokens;
+  }
+
+  // Create token (requires auth)
+  async createToken(tokenData: {
     name: string;
     symbol: string;
     description?: string;
     image?: string;
     twitter?: string;
-    telegram?: string;
     website?: string;
-  }) {
-    return this.fetch('/tokens/info', {
+    telegram?: string;
+  }): Promise<{ mint: string; signature: string }> {
+    return this.request('/tokens/create', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: tokenData,
     });
   }
 
-  // Create token - Step 2: Create launch transaction
-  async createTokenLaunchTx(params: {
-    creator: string;
-    name: string;
-    symbol: string;
-    uri: string;
-    initialBuyAmount?: number;
-  }) {
-    return this.fetch('/tokens/launch', {
+  // Upload image for token
+  async uploadImage(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${BAGS_API_BASE}/upload`, {
       method: 'POST',
-      body: JSON.stringify(params),
+      headers: {
+        'x-api-key': API_KEY,
+      },
+      body: formData,
     });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    return response.json();
   }
 
-  // Create swap transaction
-  async createSwapTx(params: {
-    quoteResponse: any;
-    userPublicKey: string;
-  }) {
-    return this.fetch('/trade/swap', {
-      method: 'POST',
-      body: JSON.stringify(params),
-    });
-  }
-
-  // Get token creators
-  async getTokenCreators(mint: string) {
-    return this.fetch(`/analytics/creators?mint=${mint}`);
-  }
-
-  // Get token lifetime fees
-  async getTokenFees(mint: string) {
-    return this.fetch(`/analytics/fees?mint=${mint}`);
+  // Get rate limit status
+  getRateLimitStatus() {
+    return {
+      remaining: this.rateLimitRemaining,
+      resetAt: new Date(this.rateLimitReset),
+    };
   }
 }
 
-export const bags = new BagsAPI();
-export default BagsAPI;
+export const bagsAPI = new BagsAPI();
+export default bagsAPI;

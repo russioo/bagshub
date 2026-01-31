@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  email         String?   @unique
+  passwordHash  String
+  avatar        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  messages      ChatMessage[]
+  bookmarks     Bookmark[]
+  reactions     MessageReaction[]
+  
+  @@map("users")
+}
+
+// Chat room per token
+model ChatRoom {
+  id        String   @id @default(cuid())
+  tokenMint String   @unique  // Solana token mint address
+  createdAt DateTime @default(now())
+  
+  // Relations
+  messages  ChatMessage[]
+  
+  @@map("chat_rooms")
+}
+
+// Chat messages
+model ChatMessage {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roomId    String
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  reactions MessageReaction[]
+  
+  @@index([roomId, createdAt])
+  @@map("chat_messages")
+}
+
+// Message reactions (emoji reactions)
+model MessageReaction {
+  id        String   @id @default(cuid())
+  emoji     String   // e.g., "🚀", "💎", "🔥"
+  createdAt DateTime @default(now())
+  
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, messageId, emoji])
+  @@map("message_reactions")
+}
+
+// User bookmarks/favorites
+model Bookmark {
+  id        String   @id @default(cuid())
+  tokenMint String   // Solana token mint address
+  notes     String?  // Optional user notes
+  createdAt DateTime @default(now())
+  
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, tokenMint])
+  @@index([userId])
+  @@map("bookmarks")
+}
+
+// Token cache for reducing API calls
+model TokenCache {
+  id          String   @id @default(cuid())
+  tokenMint   String   @unique
+  data        Json     // Cached token data
+  cachedAt    DateTime @default(now())
+  expiresAt   DateTime
+  
+  @@index([expiresAt])
+  @@map("token_cache")
+}
+
+// AI Research results cache
+model AIResearch {
+  id          String   @id @default(cuid())
+  tokenMint   String
+  analysis    Json     // AI analysis data
+  createdAt   DateTime @default(now())
+  
+  @@index([tokenMint])
+  @@map("ai_research")
+}

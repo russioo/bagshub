@@ -1,197 +1,188 @@
 import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { TokenTable } from '@/components/token-table';
+import { TokenCard } from '@/components/token-card';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Rocket, 
+  BarChart3, 
+  Users, 
+  Zap,
+  ArrowRight
+} from 'lucide-react';
+import type { BagsToken } from '@/types';
 
-// Mock data - replace with Bags API
-const tokens = [
-  { mint: '1', name: 'Bags Token', symbol: 'BAGS', price: 0.0234, change: 12.5, volume: 1250000, mcap: 23400000, holders: 45000, image: '🎒' },
-  { mint: '2', name: 'Solana Pepe', symbol: 'PEPE', price: 0.00000234, change: 45.67, volume: 5600000, mcap: 9840000, holders: 89000, image: '🐸' },
-  { mint: '3', name: 'Moon Shot', symbol: 'MOON', price: 0.000001, change: -8.2, volume: 890000, mcap: 1200000, holders: 12000, image: '🌙' },
-  { mint: '4', name: 'Diamond Hands', symbol: 'DIAMOND', price: 0.0089, change: 23.4, volume: 3400000, mcap: 8900000, holders: 34000, image: '💎' },
-  { mint: '5', name: 'Rocket Fuel', symbol: 'FUEL', price: 0.00002, change: 156.8, volume: 7800000, mcap: 2000000, holders: 8900, image: '🚀' },
-  { mint: '6', name: 'Cat Coin', symbol: 'CAT', price: 0.00456, change: -3.2, volume: 1200000, mcap: 4560000, holders: 15600, image: '🐱' },
-  { mint: '7', name: 'Based Token', symbol: 'BASED', price: 0.000005, change: 234.5, volume: 2500000, mcap: 2100000, holders: 4500, image: '🔥' },
-  { mint: '8', name: 'AI Bot', symbol: 'AIBOT', price: 0.0567, change: 8.9, volume: 2300000, mcap: 5670000, holders: 12000, image: '🤖' },
+// Mock data for demo - replace with API calls
+const mockTokens: BagsToken[] = [
+  {
+    mint: '1',
+    name: 'Bags Token',
+    symbol: 'BAGS',
+    price: 0.0234,
+    priceChange24h: 12.5,
+    volume24h: 1250000,
+    marketCap: 23400000,
+    liquidity: 890000,
+    holders: 45000,
+    supply: 1000000000,
+    createdAt: '2024-01-15',
+    image: '/tokens/bags.png',
+  },
+  {
+    mint: '2',
+    name: 'Solana Pepe',
+    symbol: 'SPEPE',
+    price: 0.00000234,
+    priceChange24h: 45.67,
+    volume24h: 5600000,
+    marketCap: 9840000,
+    liquidity: 450000,
+    holders: 89000,
+    supply: 1000000000000,
+    createdAt: '2024-02-01',
+  },
+  {
+    mint: '3',
+    name: 'Moon Shot',
+    symbol: 'MOON',
+    price: 0.000001,
+    priceChange24h: -8.2,
+    volume24h: 890000,
+    marketCap: 1200000,
+    liquidity: 120000,
+    holders: 12000,
+    supply: 1000000000000,
+    createdAt: '2024-02-10',
+  },
+  {
+    mint: '4',
+    name: 'Diamond Hands',
+    symbol: 'DIAMOND',
+    price: 0.0089,
+    priceChange24h: 23.4,
+    volume24h: 3400000,
+    marketCap: 8900000,
+    liquidity: 340000,
+    holders: 34000,
+    supply: 1000000000,
+    createdAt: '2024-01-20',
+  },
+  {
+    mint: '5',
+    name: 'Rocket Fuel',
+    symbol: 'FUEL',
+    price: 0.00002,
+    priceChange24h: 156.8,
+    volume24h: 7800000,
+    marketCap: 2000000,
+    liquidity: 200000,
+    holders: 8900,
+    supply: 100000000000,
+    createdAt: '2024-02-15',
+  },
 ];
 
-function formatNumber(n: number): string {
-  if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
-  if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return '$' + (n / 1e3).toFixed(2) + 'K';
-  return '$' + n.toFixed(2);
-}
+const stats = [
+  { label: 'Total Tokens', value: '2,847', icon: Zap, change: '+124 today' },
+  { label: 'Total Volume', value: '$127M', icon: BarChart3, change: '+18.5%' },
+  { label: 'Active Traders', value: '45.2K', icon: Users, change: '+2.1K' },
+  { label: 'New Launches', value: '89', icon: Rocket, change: 'last 24h' },
+];
 
-function formatPrice(n: number): string {
-  if (n < 0.0001) return '$' + n.toExponential(2);
-  if (n < 0.01) return '$' + n.toFixed(6);
-  if (n < 1) return '$' + n.toFixed(4);
-  return '$' + n.toFixed(2);
-}
-
-export default function Home() {
+export default function HomePage() {
   return (
-    <div>
+    <div className="space-y-8">
       {/* Hero Section */}
-      <section className="fade-in" style={{
-        textAlign: 'center',
-        padding: '80px 0',
-        marginBottom: '60px',
-      }}>
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 16px',
-          background: 'var(--accent-glow)',
-          borderRadius: '100px',
-          marginBottom: '24px',
-          fontSize: '13px',
-          fontWeight: 500,
-          color: 'var(--accent)',
-        }}>
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)' }} />
+      <section className="text-center py-12">
+        <Badge className="mb-4" variant="outline">
+          <span className="w-2 h-2 rounded-full bg-bags-green mr-2 animate-pulse" />
           Live on Solana
-        </div>
-        
-        <h1 style={{
-          fontSize: '56px',
-          fontWeight: 700,
-          letterSpacing: '-2px',
-          lineHeight: 1.1,
-          marginBottom: '20px',
-          background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-        }}>
-          Track every token<br />on Bags
+        </Badge>
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
+          Track every token
+          <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-bags-green to-bags-green-dark">
+            on Bags
+          </span>
         </h1>
-        
-        <p style={{
-          fontSize: '18px',
-          color: 'var(--text-secondary)',
-          maxWidth: '500px',
-          margin: '0 auto 40px',
-          lineHeight: 1.6,
-        }}>
+        <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
           Real-time prices, volume, and analytics for all tokens launched through the Bags protocol.
+          Launch your own token in minutes.
         </p>
-
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
-          <Link href="/launch" className="btn btn-primary" style={{ padding: '14px 32px', fontSize: '15px' }}>
-            Launch a Token
+        <div className="flex flex-wrap justify-center gap-4">
+          <Link href="/tokens/launch">
+            <Button size="lg" className="gap-2">
+              <Rocket className="h-5 w-5" />
+              Launch Token
+            </Button>
           </Link>
-          <a href="#tokens" className="btn btn-secondary" style={{ padding: '14px 32px', fontSize: '15px' }}>
-            Explore Tokens
-          </a>
+          <Link href="/tokens/trending">
+            <Button size="lg" variant="outline" className="gap-2">
+              <TrendingUp className="h-5 w-5" />
+              View Trending
+            </Button>
+          </Link>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="fade-in stagger-1" style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '20px',
-        marginBottom: '60px',
-      }}>
-        {[
-          { label: 'Total Tokens', value: '2,847' },
-          { label: 'Total Volume', value: '$127M' },
-          { label: 'Active Traders', value: '45.2K' },
-          { label: '24h Transactions', value: '892K' },
-        ].map((stat, i) => (
-          <div key={i} className="card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', fontWeight: 600, marginBottom: '4px' }}>{stat.value}</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{stat.label}</div>
-          </div>
-        ))}
+      {/* Stats Grid */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <Card key={stat.label}>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">{stat.label}</span>
+                </div>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                <div className="text-xs text-bags-green mt-1">{stat.change}</div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </section>
 
-      {/* Token Table */}
-      <section id="tokens" className="fade-in stagger-2">
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '24px',
-        }}>
+      {/* Trending Section */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '4px' }}>All Tokens</h2>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Sorted by 24h volume</p>
+            <h2 className="text-2xl font-bold">Trending Tokens</h2>
+            <p className="text-muted-foreground">Top performing tokens in the last 24h</p>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {['All', 'New', 'Gainers', 'Trending'].map((filter, i) => (
-              <button 
-                key={filter}
-                className={i === 0 ? 'btn btn-primary' : 'btn btn-secondary'}
-                style={{ padding: '8px 16px', fontSize: '13px' }}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
+          <Link href="/tokens/trending">
+            <Button variant="ghost" className="gap-2">
+              View All
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {mockTokens.slice(0, 3).map((token, i) => (
+            <TokenCard key={token.mint} token={token} rank={i + 1} />
+          ))}
+        </div>
+      </section>
 
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: '50px' }}>#</th>
-                <th>Token</th>
-                <th style={{ textAlign: 'right' }}>Price</th>
-                <th style={{ textAlign: 'right' }}>24h</th>
-                <th style={{ textAlign: 'right' }}>Volume</th>
-                <th style={{ textAlign: 'right' }}>Market Cap</th>
-                <th style={{ textAlign: 'right' }}>Holders</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tokens.map((token, i) => (
-                <tr key={token.mint}>
-                  <td style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{i + 1}</td>
-                  <td>
-                    <Link href={`/token/${token.mint}`} style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '14px',
-                    }}>
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '12px',
-                        background: 'var(--bg-hover)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '20px',
-                      }}>
-                        {token.image}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 500, marginBottom: '2px' }}>{token.name}</div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{token.symbol}</div>
-                      </div>
-                    </Link>
-                  </td>
-                  <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 500 }}>
-                    {formatPrice(token.price)}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <span className={token.change >= 0 ? 'badge badge-green' : 'badge badge-red'}>
-                      {token.change >= 0 ? '+' : ''}{token.change.toFixed(2)}%
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
-                    {formatNumber(token.volume)}
-                  </td>
-                  <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
-                    {formatNumber(token.mcap)}
-                  </td>
-                  <td style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>
-                    {token.holders.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* All Tokens Table */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold">All Tokens</h2>
+            <p className="text-muted-foreground">Sorted by 24h volume</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm">All</Button>
+            <Button variant="ghost" size="sm">New</Button>
+            <Button variant="ghost" size="sm">Gainers</Button>
+            <Button variant="ghost" size="sm">Losers</Button>
+          </div>
         </div>
+        <TokenTable tokens={mockTokens} />
       </section>
     </div>
   );
