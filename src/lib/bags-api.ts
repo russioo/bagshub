@@ -13,78 +13,40 @@ export interface BagsToken {
   createdAt: string;
 }
 
-// Get trending Solana tokens from DexScreener
+// Get only Bags tokens - their mint addresses end with "BAGS"
 export async function getTokens(): Promise<BagsToken[]> {
   try {
-    // Get Solana token pairs sorted by volume
-    const res = await fetch('https://api.dexscreener.com/token-boosts/top/v1', {
+    // Search for tokens with BAGS in the query
+    const res = await fetch('https://api.dexscreener.com/latest/dex/search?q=BAGS', {
       next: { revalidate: 60 },
     });
     
     if (!res.ok) {
-      // Fallback: Get trending from token profiles
-      return getTokensFallback();
+      console.error('DexScreener API error:', res.status);
+      return [];
     }
     
     const data = await res.json();
-    
-    // Filter for Solana only
-    const solanaPairs = (data || [])
-      .filter((p: any) => p.chainId === 'solana')
-      .slice(0, 50);
-    
-    if (solanaPairs.length === 0) {
-      return getTokensFallback();
+    if (!data.pairs) {
+      console.log('No pairs in response');
+      return [];
     }
     
-    // Get detailed data for each token
-    const mints = solanaPairs.map((p: any) => p.tokenAddress).filter(Boolean);
-    return getTokensByMints(mints);
-  } catch {
-    return getTokensFallback();
-  }
-}
-
-async function getTokensFallback(): Promise<BagsToken[]> {
-  try {
-    // Try token profiles endpoint
-    const res = await fetch('https://api.dexscreener.com/token-profiles/latest/v1', {
-      next: { revalidate: 60 },
+    console.log('Total pairs from search:', data.pairs.length);
+    
+    // STRICT filter: Solana chain AND mint ends with "BAGS"
+    const bagsPairs = data.pairs.filter((p: any) => {
+      if (p.chainId !== 'solana') return false;
+      const mint = p.baseToken?.address || '';
+      const isBags = mint.toUpperCase().endsWith('BAGS');
+      return isBags;
     });
     
-    if (!res.ok) return [];
+    console.log('Bags pairs after filter:', bagsPairs.length);
     
-    const data = await res.json();
-    const solanaTokens = (data || [])
-      .filter((t: any) => t.chainId === 'solana')
-      .slice(0, 50);
-    
-    const mints = solanaTokens.map((t: any) => t.tokenAddress).filter(Boolean);
-    return getTokensByMints(mints);
-  } catch {
-    return [];
-  }
-}
-
-async function getTokensByMints(mints: string[]): Promise<BagsToken[]> {
-  if (mints.length === 0) return [];
-  
-  try {
-    const mintStr = mints.slice(0, 30).join(',');
-    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintStr}`, {
-      next: { revalidate: 30 },
-    });
-    
-    if (!res.ok) return [];
-    
-    const data = await res.json();
-    if (!data.pairs) return [];
-    
-    // Group by token and get best pair
+    // Group by token, keep pair with best liquidity
     const tokenMap = new Map<string, any>();
-    for (const pair of data.pairs) {
-      if (pair.chainId !== 'solana') continue;
-      
+    for (const pair of bagsPairs) {
       const mint = pair.baseToken?.address;
       if (!mint) continue;
       
@@ -94,10 +56,14 @@ async function getTokensByMints(mints: string[]): Promise<BagsToken[]> {
       }
     }
     
+    console.log('Unique Bags tokens:', tokenMap.size);
+    
+    // Sort by volume
     return Array.from(tokenMap.values())
-      .sort((a, b) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
-      .map(pairToToken);
-  } catch {
+      .map(pairToToken)
+      .sort((a, b) => b.volume24h - a.volume24h);
+  } catch (e) {
+    console.error('Error fetching tokens:', e);
     return [];
   }
 }
@@ -120,7 +86,7 @@ function pairToToken(pair: any): BagsToken {
 
 export async function getTrendingTokens(): Promise<BagsToken[]> {
   const tokens = await getTokens();
-  return tokens.sort((a, b) => b.volume24h - a.volume24h).slice(0, 20);
+  return tokens.slice(0, 20);
 }
 
 export async function getToken(mint: string): Promise<BagsToken | null> {
@@ -134,7 +100,6 @@ export async function getToken(mint: string): Promise<BagsToken | null> {
     const data = await res.json();
     if (!data.pairs || data.pairs.length === 0) return null;
     
-    // Get Solana pair with best liquidity
     const solanaPairs = data.pairs.filter((p: any) => p.chainId === 'solana');
     if (solanaPairs.length === 0) return null;
     
